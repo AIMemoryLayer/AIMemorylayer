@@ -1,0 +1,10 @@
+{
+  "name": "memory-service",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uvicorn services.memory.main:app --reload --port 8000",
+    "build": "echo 'No build required for Python FastAPI'",
+    "lint": "ruff check services/memory && ruff format --check services/memory"
+  }
+}
