@@ -1,0 +1,22 @@
+# Base Python image
+FROM python:3.10-slim AS builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    POETRY_VERSION=1.8.2 \
+    NODE_VERSION=20.x
+
+# Install essential build tools, curl, and Node.js
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    build-essential \
+    && curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION} | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g pnpm \
+    && pip install "poetry==$POETRY_VERSION" \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Base working directory
+WORKDIR /app

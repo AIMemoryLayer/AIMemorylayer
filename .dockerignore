@@ -1,0 +1,22 @@
+.git
+.gitignore
+.pre-commit-config.yaml
+.editorconfig
+README.md
+PRIVACY_MANIFESTO.md
+CHANGELOG.md
+
+# Node
+node_modules/
+dist/
+.next/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+.venv/
+poetry.lock
