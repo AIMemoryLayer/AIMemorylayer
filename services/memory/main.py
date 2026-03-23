@@ -22,7 +22,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Support both versioned and unversioned routes for better DX
 app.include_router(memory_router, prefix="/v1")
+app.include_router(memory_router)
 
 
 @app.get("/health")

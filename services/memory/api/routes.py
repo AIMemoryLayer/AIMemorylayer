@@ -1,13 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from shared.python.models.memory import MemoryRecord
-from services.memory.core.vector_store import VectorStoreProvider, InMemoryVectorStore
+from services.memory.core.vector_store import VectorStoreProvider
+from services.memory.core.faiss_store import FaissVectorStore
 import uuid
 
 router = APIRouter(tags=["Memories"])
 
-# In a real app, inject this via dependency injection
-vector_store: VectorStoreProvider = InMemoryVectorStore()
+# Use FAISS for lightweight persistence on Windows
+vector_store: VectorStoreProvider = FaissVectorStore()
 
 
 @router.post("/memories", response_model=MemoryRecord)
