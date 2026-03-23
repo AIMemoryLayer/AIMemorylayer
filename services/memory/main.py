@@ -1,7 +1,13 @@
+import os
+import sys
 import logging
+
+# Ensure the repository root is in the python path for shared models
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from services.memory.api.routes import router as memory_router
+from api.routes import router as memory_router
 
 logger = logging.getLogger(__name__)
 
