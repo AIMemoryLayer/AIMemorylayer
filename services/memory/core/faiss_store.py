@@ -2,7 +2,8 @@ import os
 import faiss
 import numpy as np
 import pickle
-from typing import List
+import asyncio
+from typing import List, Dict, Any, Optional
 from shared.python.models.memory import MemoryRecord
 from services.memory.core.vector_store import VectorStoreProvider
 from langchain_community.embeddings import OllamaEmbeddings
@@ -28,16 +29,18 @@ class FaissVectorStore(VectorStoreProvider):
         self.embeddings = OllamaEmbeddings(model=ollama_model, base_url=ollama_url)
         self.dimension = 768  # nomic-embed-text dimension
 
-        # Initialize FAISS index
+        # nomic-embed-text generates 768-dim vectors.
+        # Use Inner Product (IP) index for Cosine Similarity (with normalized vectors).
         if os.path.exists(self.index_path):
             self.index = faiss.read_index(self.index_path)
             with open(self.meta_path, "rb") as f:
                 self.records = pickle.load(f)
         else:
-            self.index = faiss.IndexFlatL2(self.dimension)
+            self.index = faiss.IndexFlatIP(self.dimension)
             self.records = []
 
-    def _save(self):
+    def _save_sync(self):
+        """Synchronous disk I/O should be called via to_thread."""
         faiss.write_index(self.index, self.index_path)
         with open(self.meta_path, "wb") as f:
             pickle.dump(self.records, f)
@@ -46,7 +49,9 @@ class FaissVectorStore(VectorStoreProvider):
         # 1. Generate Embedding
         try:
             vector = await self.embeddings.aembed_query(memory.content)
-            memory.vector = vector
+            # Normalize for Cosine Similarity
+            norm = np.linalg.norm(vector)
+            memory.vector = (np.array(vector) / norm).tolist() if norm > 0 else vector
         except Exception as e:
             print(f"Embedding failed: {e}")
             memory.vector = [0.0] * self.dimension
@@ -57,29 +62,52 @@ class FaissVectorStore(VectorStoreProvider):
 
         # 3. Store Metadata
         self.records.append(memory)
-        self._save()
+        await asyncio.to_thread(self._save_sync)
 
     async def get_by_owner(self, owner_id: str, limit: int) -> List[MemoryRecord]:
         return [r for r in self.records if r.owner_id == owner_id][-limit:]
 
-    async def search(self, owner_id: str, query: str, limit: int) -> List[MemoryRecord]:
-        # 1. Embed query
+    async def search(
+        self,
+        owner_id: str,
+        query: str,
+        limit: int,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> List[MemoryRecord]:
+        # 1. Embed and Normalize query
         query_vec = await self.embeddings.aembed_query(query)
         query_np = np.array([query_vec], dtype=np.float32)
+        norm = np.linalg.norm(query_np)
+        if norm > 0:
+            query_np = query_np / norm
 
         # 2. Search FAISS
         distances, indices = self.index.search(query_np, len(self.records))
 
-        # 3. Filter by owner and limit
+        # 3. Filter by owner and metadata
         results = []
         for idx in indices[0]:
             if idx == -1:
                 continue
             record = self.records[idx]
-            if record.owner_id == owner_id:
-                results.append(record)
-                if len(results) >= limit:
-                    break
+
+            # Tenant Isolation
+            if record.owner_id != owner_id:
+                continue
+
+            # Metadata Filtering
+            if filters:
+                match = True
+                for key, val in filters.items():
+                    if record.metadata.get(key) != val:
+                        match = False
+                        break
+                if not match:
+                    continue
+
+            results.append(record)
+            if len(results) >= limit:
+                break
         return results
 
     async def delete(self, memory_id: str) -> bool:
