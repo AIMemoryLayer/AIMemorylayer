@@ -1,6 +1,7 @@
 packages:
   - "services/*"
-  - "frontend/*"
+  - "frontend/apps/*"
+  - "frontend/packages/*"
   - "shared/*"
   - "infra/*"
   - "packages/*"
